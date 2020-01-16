@@ -5,7 +5,7 @@
    [lit-exp
    (id lit?)]
    [lambda-exp
-   (id (lambda (v) (or (symbol? v) (list-of expression?))))
+   (id (lambda (v) (or (expression? v) (list-of expression?))))
    (body (lambda (v) (or (expression? v) (list-of expression?))))]
 
    [let-exp
@@ -89,6 +89,36 @@
           [else (app-exp (parse-exp (1st datum))
             (imp-list-apply parse-exp (cdr datum)))])]
         [else (eopl:error 'parse-exp "bad expression: ~s" datum)])))
+
+(define unparse-exp
+  (lambda (datum)
+    (if (list-contains? "." datum)
+      (imp-list-unparse datum)
+      (cases expression datum
+        [var-exp (id)
+          id]
+        [lit-exp (id)
+          id]
+        [lambda-exp (id body)
+          (list 'lambda (imp-list-unparse id) (unparse-exp body))]
+        [let-exp (id body)
+          ]
+        [letrec-exp (id body)
+          ]
+        [let*-exp (id body)
+          ]
+        [if-exp (bool iftrue)
+          ]
+        [if-else-exp (bool iftrue iffalse)
+          ]
+        [set!-exp (id body)
+          ]
+        [app-exp (rator rand)
+          (if (list? rand)
+            (cons (unparse-exp rator) (map unparse-exp rand))
+            (list (unparse-exp rator) (unparse-exp rand)))]))))
+; unparser on app-exp isn't working, it has to do with the fact that rand is a list of expressions i think
+
 ; An auxiliary procedure that could be helpful.
 (define var-exp?
  (lambda (x)
@@ -123,3 +153,23 @@
         (cons (proc (car iList)) (append '(".") (list (proc (cdr iList)))))]
       [else
         (cons (proc (car iList)) (imp-list-apply proc (cdr iList)))])))
+
+(define imp-list-unparse
+  (lambda (iList)
+    (cond
+      [(null? iList)
+        '()]
+      [(null? (cdr iList))
+        (list (unparse-exp (car iList)))]
+      [(equal? "." (2nd iList))
+        (cons (cons (unparse-exp (1st iList)) (unparse-exp (3rd iList))) (imp-list-unparse (cddd r iList)))]
+      [else
+        (cons (unparse-exp (1st iList)) (imp-list-unparse (cdr iList)))])))
+
+(define list-contains?
+  (lambda (n li)
+    (if (or (null? li) (not (list? li)))
+      #f
+      (if (equal? n (car li))
+        #t
+        (list-contains? n (cdr li))))))
