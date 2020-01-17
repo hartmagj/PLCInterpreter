@@ -1,4 +1,4 @@
-
+(load chez-init.ss)
 (define-datatype expression expression?
   [var-exp
    (id symbol?)]
@@ -41,6 +41,7 @@
       [(number? v) #t]
       [(string? v) #t]
       [(boolean? v) #t]
+      [(vector? v) #t]
       [(char? v) #t]
       [(null? v) #t]
       [else #f]
@@ -54,6 +55,7 @@
         [(string? datum) (lit-exp datum)]
         [(boolean? datum) (lit-exp datum)]
         [(char? datum) (lit-exp datum)]
+        [(vector? datum) (lit-exp datum)]
         [(null? datum) (lit-exp datum)]
         [(pair? datum)
         (cond
@@ -62,7 +64,7 @@
               [(<(length datum) 3) 
                 (eopl:error 'parse-exp "Error in parse-exp: lambda-expression: incorrect length:" datum)]
               [(not (valid-lambda-var? (2nd datum)))
-                (eopl:error 'parse-exp "Error in parse-exp: lambda-expression: lambda var declaration must contain all symbols" datum)]
+                (eopl:error 'parse-exp "Error in parse-exp: lambda-expression: lambda var declaration must contain all symbols:" datum)]
               [else
                 (lambda-exp (imp-list-apply parse-exp (2nd datum)) (imp-list-apply parse-exp (cddr datum)))]
               ; [(symbol? (2nd datum)) 
@@ -73,50 +75,88 @@
           ]
           [(eqv? (1st datum) 'let)
           (cond
-            [(< (length datum) 2) (eopl:error 'parse-exp "Error in parse-exp: let expression: incorrect length")]
-            [(not (list? (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: let expression: declaration in let is not a list")]
-            [(not (andmap (lambda (x) (= 2 (length x))) (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: let expression: declaration in let must be a list of length 2")]
-            [(not (andmap list? (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: let expression: expression is not a proper list")]
-            [(not (andmap symbol? (map 1st (2nd datum)))) (eopl:error 'parse-exp "Error in parse-exp: let expression: vars in let-exp must be symbols")]
-            [else (let-exp (map list (map parse-exp (map 1st (2nd datum))) (map parse-exp (map 2nd (2nd datum)))) (map parse-exp (cddr exp)))]
+            [(< (length datum) 2) (eopl:error 'parse-exp "Error in parse-exp: let expression: incorrect length:" datum)]
+            [(not (list? (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: let expression: declaration in let is not a list:" datum)]
+            [(not (andmap (lambda (x) (= 2 (length x))) (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: let expression: declaration in let must be a list of length 2:" datum)]
+            [(not (andmap list? (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: let expression: expression is not a proper list:" datum)]
+            [(not (andmap symbol? (map 1st (2nd datum)))) (eopl:error 'parse-exp "Error in parse-exp: let expression: vars in let-exp must be symbols:" datum)]
+            [else (let-exp (map list (imp-list-apply parse-exp (map 1st (2nd datum))) (imp-list-apply parse-exp (map 2nd (2nd datum)))) (map parse-exp (cddr datum)))]
             )
           ]
-          
-
-
-
-
+          [(eqv? (1st datum) 'if)
+          (cond
+            [(or (< (length datum) 3) (> (length datum) 4)) (eopl:error 'parse-exp "Error in parse-exp: if expression: incorrect length :" datum)]
+            [(= (length datum) 3) (if-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)))]
+            [else (if-else-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)) (parse-exp (cadddr datum)))]
+            )
+          ]
+          [(eqv? (1st datum) 'set!)
+          (cond 
+            [(not (= (length datum) 3)) (eopl:error 'parse-exp "Error in parse-exp: set! expression: incorrect length:" datum)]
+            [else (set!-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)))]
+            )
+          ]
+          [(eqv? (1st datum) 'letrec)
+          (cond
+            [(< (length datum) 2) (eopl:error 'parse-exp "Error in parse-exp: letrec expression: incorrect length:" datum)]
+            [(not (list? (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: letrec expression: invalid arguments:" datum)]
+            [(not (andmap (lambda (x) (= 2 (length x))) (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: letrec expression: declaration in letrec must be a list of length 2:" datum)]
+            [(not (andmap list? (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: letrec expression: expression is not a proper list:" datum)]
+            [(not (andmap symbol? (map 1st (2nd datum)))) (eopl:error 'parse-exp "Error in parse-exp: letrec expression: vars in let-exp must be symbols:" datum)]
+            [else (letrec-exp (map list (imp-list-apply parse-exp (map 1st (2nd datum))) (imp-list-apply parse-exp (map 2nd (2nd datum)))) (imp-list-apply parse-exp (cddr datum)))]
+            )
+          ]
+          [(eqv? (1st datum) 'let*)
+          (cond
+            [(< (length datum) 2) (eopl:error 'parse-exp "Error in parse-exp: let** expression: incorrect length: " datum)]
+            [(not (list? (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: let* expression: declaration in let* is not a list:" datum)]
+            [(not (andmap (lambda (x) (= 2 (length x))) (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: let* expression: declaration in let* must be a list of length 2")]
+            [(not (andmap list? (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: let* expression: expression is not a proper list")]
+            [(not (andmap symbol? (map 1st (2nd datum)))) (eopl:error 'parse-exp "Error in parse-exp: let* expression: vars in let*-exp must be symbols")]
+            [else (let*-exp (map list (imp-list-apply parse-exp (map 1st (2nd datum))) (imp-list-apply parse-exp (map 2nd (2nd datum)))) (imp-list-apply parse-exp (cddr datum)))]
+            )
+          ]
           [else (app-exp (parse-exp (1st datum))
             (imp-list-apply parse-exp (cdr datum)))])]
         [else (eopl:error 'parse-exp "bad expression: ~s" datum)])))
 
 (define unparse-exp
   (lambda (datum)
-    (if (list-contains? "." datum)
-      (imp-list-unparse datum)
-      (cases expression datum
+    (cases expression datum
         [var-exp (id)
           id]
         [lit-exp (id)
           id]
         [lambda-exp (id body)
-          (list 'lambda (imp-list-unparse id) (unparse-exp body))]
+        (cond
+          [(null? id) (cons 'lambda (cons '() (map unparse-exp body)))]
+          [(list? (1st id)) (cons 'lambda (cons (map unparse-exp id) (map unparse-exp body)))]
+          [else (cons 'lambda (cons (unparse-exp id) (map unparse-exp body)))]
+          )
+          ]
         [let-exp (id body)
+        (cons 'let (cons (map list (map unparse-exp (map 1st id)) (map unparse-exp (map 2nd id))) (map unparse-exp body)))
           ]
         [letrec-exp (id body)
+        (cons 'letrec (cons (map list (map unparse-exp (map 1st id)) (map unparse-exp (map 2nd id))) (map unparse-exp body)))
+
           ]
         [let*-exp (id body)
+        (cons 'let* (cons (map list (map unparse-exp (map 1st id)) (map unparse-exp (map 2nd id))) (map unparse-exp body)))
           ]
         [if-exp (bool iftrue)
+        (list 'if (unparse-exp bool) (unparse-exp iftrue))
           ]
         [if-else-exp (bool iftrue iffalse)
+        (list 'if (unparse-exp bool) (unparse-exp iftrue) (unparse-exp iffalse))
           ]
         [set!-exp (id body)
+        (list 'set! (unparse-exp id) (unparse-exp body))
           ]
         [app-exp (rator rand)
           (if (list? rand)
             (cons (unparse-exp rator) (map unparse-exp rand))
-            (list (unparse-exp rator) (unparse-exp rand)))]))))
+            (list (unparse-exp rator) (unparse-exp rand)))])))
 ; unparser on app-exp isn't working, it has to do with the fact that rand is a list of expressions i think
 
 ; An auxiliary procedure that could be helpful.
@@ -154,22 +194,15 @@
       [else
         (cons (proc (car iList)) (imp-list-apply proc (cdr iList)))])))
 
+
 (define imp-list-unparse
   (lambda (iList)
     (cond
       [(null? iList)
         '()]
       [(null? (cdr iList))
-        (list (unparse-exp (car iList)))]
+        (list (unparse-exp (1st iList)))]
       [(equal? "." (2nd iList))
         (cons (cons (unparse-exp (1st iList)) (unparse-exp (3rd iList))) (imp-list-unparse (cddd r iList)))]
       [else
         (cons (unparse-exp (1st iList)) (imp-list-unparse (cdr iList)))])))
-
-(define list-contains?
-  (lambda (n li)
-    (if (or (null? li) (not (list? li)))
-      #f
-      (if (equal? n (car li))
-        #t
-        (list-contains? n (cdr li))))))
