@@ -1,4 +1,4 @@
-(load chez-init.ss)
+(load "chez-init.ss")
 (define-datatype expression expression?
   [var-exp
    (id symbol?)]
@@ -75,10 +75,10 @@
           ]
           [(eqv? (1st datum) 'let)
           (cond
-            [(< (length datum) 2) (eopl:error 'parse-exp "Error in parse-exp: let expression: incorrect length:" datum)]
+            [(not (> (length datum) 2)) (eopl:error 'parse-exp "Error in parse-exp: let expression: incorrect length:" datum)]
             [(not (list? (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: let expression: declaration in let is not a list:" datum)]
             [(not (andmap (lambda (x) (= 2 (length x))) (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: let expression: declaration in let must be a list of length 2:" datum)]
-            [(not (andmap list? (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: let expression: expression is not a proper list:" datum)]
+            [(not (andmap list? (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: let expression: not all proper lists:" datum)]
             [(not (andmap symbol? (map 1st (2nd datum)))) (eopl:error 'parse-exp "Error in parse-exp: let expression: vars in let-exp must be symbols:" datum)]
             [else (let-exp (map list (imp-list-apply parse-exp (map 1st (2nd datum))) (imp-list-apply parse-exp (map 2nd (2nd datum)))) (map parse-exp (cddr datum)))]
             )
@@ -98,7 +98,7 @@
           ]
           [(eqv? (1st datum) 'letrec)
           (cond
-            [(< (length datum) 2) (eopl:error 'parse-exp "Error in parse-exp: letrec expression: incorrect length:" datum)]
+            [(not (> (length datum) 2)) (eopl:error 'parse-exp "Error in parse-exp: letrec expression: incorrect length:" datum)]
             [(not (list? (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: letrec expression: invalid arguments:" datum)]
             [(not (andmap (lambda (x) (= 2 (length x))) (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: letrec expression: declaration in letrec must be a list of length 2:" datum)]
             [(not (andmap list? (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: letrec expression: expression is not a proper list:" datum)]
@@ -108,7 +108,7 @@
           ]
           [(eqv? (1st datum) 'let*)
           (cond
-            [(< (length datum) 2) (eopl:error 'parse-exp "Error in parse-exp: let** expression: incorrect length: " datum)]
+            [(not (> (length datum) 2)) (eopl:error 'parse-exp "Error in parse-exp: let** expression: incorrect length: " datum)]
             [(not (list? (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: let* expression: declaration in let* is not a list:" datum)]
             [(not (andmap (lambda (x) (= 2 (length x))) (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: let* expression: declaration in let* must be a list of length 2")]
             [(not (andmap list? (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: let* expression: expression is not a proper list")]
