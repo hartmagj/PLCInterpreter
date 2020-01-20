@@ -334,6 +334,8 @@
         (if (eval-exp test)
           (eval-exp iftrue)
           (eval-exp iffalse))]
+      ; [lambda-exp (id body)
+      ;   ]
       [else (eopl:error 'eval-exp "Bad abstract syntax: ~a" exp)])))
 
 ; checks the rator for a quote operator, if so it opts out of evaluating the rands
@@ -362,7 +364,8 @@
                    "Attempt to apply bad procedure: ~s" 
                     proc-value)])))
 
-(define *prim-proc-names* '(+ - * add1 sub1 cons = quote))
+(define *prim-proc-names* 
+  '(+ - * / add1 sub1 cons = >= <= quote list eq? equal? length list->vector not zero? car cdr null? list? pair? vector->list vector? number? symbol? caar cadr cadar procedure?))
 
 (define init-env         ; for now, our initial global environment only contains 
   (extend-env            ; procedure names.  Recall that an environment associates
@@ -377,17 +380,69 @@
 (define apply-prim-proc
   (lambda (prim-proc args)
     (case prim-proc
-      [(+) (+ (1st args) (2nd args))]
-      [(-) (- (1st args) (2nd args))]
-      [(*) (* (1st args) (2nd args))]
+      [(+) (if (null? (cdr args))
+              (+ (car args))
+              (acc-prim + args))]
+      [(-) (if (null? (cdr args))
+              (- (car args))
+              (acc-prim - args))]
+      [(*) (if (null? (cdr args))
+              (* (car args))
+              (acc-prim * args))]
+      [(/) (if (null? (cdr args))
+              (/ (car args))
+              (acc-prim / args))]
       [(add1) (+ (1st args) 1)]
       [(sub1) (- (1st args) 1)]
-      [(cons) (cons (1st args) (2nd args))]
-      [(=) (= (1st args) (2nd args))]
+      [(cons) (display args)]
+      [(=) (if (null? (cdr args))
+              #t
+              (acc-eq = args))]
+      [(>=) (if (null? (cdr args))
+              #t
+              (acc-eq >= args))]
+      [(<=) (if (null? (cdr args))
+              #t
+              (acc-eq <= args))]
       [(quote) (car args)]
+      [(list) (list args)]
+      [(eq?) (eq? (1st args) (2nd args))]
+      [(equal?) (equal? (1st args) (2nd args))]
+      [(length) (length args)]
+      [(list->vector) (list->vector args)]
+      [(not) (not (car args))]
+      [(zero?) (zero? (car args))]
+      [(car) (car args)]
+      [(cdr) (cdr args)]
+      [(null?) (null? args)]
+      [(list?) (list? args)]
+      [(pair?) (pair? args)]
+      [(vector->list) (vector->list args)]
+      [(vector?) (vector? args)]
+      [(number?) (number? args)]
+      [(symbol?) (sybmol? args)]
+      [(caar) (caar args)]
+      [(cadr) (cadr args)]
+      [(cadar) (cadar args)]
+      [(procedure?) (procedure? args)]
       [else (error 'apply-prim-proc 
             "Bad primitive procedure name: ~s" 
             prim-proc)])))
+
+; does math the way scheme handles it
+(define acc-prim
+  (lambda (prim-proc args)
+    (if (null? (cdr args))
+              (car args)
+              (acc-prim prim-proc (cons (prim-proc (1st args) (2nd args)) (cddr args))))))
+
+(define acc-eq
+  (lambda (prim-proc args)
+    (if (null? (cddr args))
+      (prim-proc (1st args) (2nd args))
+      (if (prim-proc (1st args) (2nd args))
+        (acc-eq prim-proc (cons (2nd args) (cddr args)))
+        #f))))
 
 (define rep      ; "read-eval-print" loop.
   (lambda ()
