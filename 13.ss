@@ -330,9 +330,10 @@
         (let ([proc-value (eval-exp rator)]
               [args (check-quote rator rands)])
           (apply-proc proc-value args))]
-      [lambda-exp (id body)
-      ;TODO implement lambdas
-        (display id)]
+      [if-else-exp (test iftrue iffalse)
+        (if (eval-exp test)
+          (eval-exp iftrue)
+          (eval-exp iffalse))]
       [else (eopl:error 'eval-exp "Bad abstract syntax: ~a" exp)])))
 
 ; checks the rator for a quote operator, if so it opts out of evaluating the rands
