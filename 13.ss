@@ -1,16 +1,12 @@
-;:  Single-file version of the interpreter.
-;; Easier to submit to server, probably harder to use in the development process
+;:  By: Reyd Nguyen and Grant Hartman
 
-(load "chez-init.ss") 
+;(load "chez-init.ss") 
 
 ;-------------------+
 ;                   |
 ;    DATATYPES      |
 ;                   |
 ;-------------------+
-
-; parsed expression.  You'll probably want to replace this 
-; code with your expression datatype from A11b
 
 (define-datatype expression expression?
   [var-exp
@@ -20,7 +16,6 @@
    [lambda-exp
    (id (lambda (v) (or (expression? v) (list-of expression?))))
    (body (lambda (v) (or (expression? v) (list-of expression?))))]
-
    [let-exp
    (id (list-of (list-of expression?)))
    (body (list-of expression?))]
@@ -43,6 +38,19 @@
    [app-exp
    (rator expression?)
    (rand (lambda (v) (or (expression? v) (list-of expression?))))])
+
+; helper procedure
+(define lit?
+  (lambda (v)
+    (cond
+      [(number? v) #t]
+      [(string? v) #t]
+      [(boolean? v) #t]
+      [(vector? v) #t]
+      [(char? v) #t]
+      [(null? v) #t]
+      [else #f]
+      )))
   
 
 ;; environment type definitions
@@ -63,11 +71,7 @@
 
 (define-datatype proc-val proc-val?
   [prim-proc
-   (name symbol?)]
-   [closure
-   (ids (list-of symbol?))
-   (bodies (list-of expression?))
-   (env environment?)])
+   (name symbol?)])
 
   
 ;-------------------+
@@ -85,17 +89,8 @@
 (define 1st car)
 (define 2nd cadr)
 (define 3rd caddr)
-(define lit?
-  (lambda (v)
-    (cond
-      [(number? v) #t]
-      [(string? v) #t]
-      [(boolean? v) #t]
-      [(vector? v) #t]
-      [(char? v) #t]
-      [(null? v) #t]
-      [else #f]
-      )))
+
+; Again, you'll probably want to use your code form A11b
 
 (define parse-exp         
   (lambda (datum)
@@ -107,6 +102,8 @@
         [(char? datum) (lit-exp datum)]
         [(vector? datum) (lit-exp datum)]
         [(null? datum) (lit-exp datum)]
+        [(not (list? datum))
+          (eopl:error 'parse-exp "Error in parse-exp: attempt to apply non-list: " datum)]
         [(pair? datum)
         (cond
           [(eqv? (1st datum) 'lambda)
@@ -117,17 +114,13 @@
                 (eopl:error 'parse-exp "Error in parse-exp: lambda-expression: lambda var declaration must contain all symbols:" datum)]
               [else
                 (lambda-exp (imp-list-apply parse-exp (2nd datum)) (imp-list-apply parse-exp (cddr datum)))]
-              ; [(symbol? (2nd datum)) 
-              ;   (lambda-exp (parse-exp (2nd datum)) (map parse-exp (cddr datum)))]
-              ; [else 
-              ;   (lambda-exp (map parse-exp (2nd datum)) (map parse-exp (cddr datum)))]
             )
           ]
           [(eqv? (1st datum) 'let)
           (cond
             [(not (> (length datum) 2)) (eopl:error 'parse-exp "Error in parse-exp: let expression: incorrect length:" datum)]
             [(not (list? (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: let expression: declaration in let is not a list:" datum)]
-            [(not (andmap list? (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: let expression: not all proper lists:" datum)]
+            [(not (andmap list? (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: let expression: all let variables are not represented as proper lists: " datum)]
             [(not (andmap (lambda (x) (= 2 (length x))) (2nd datum))) (eopl:error 'parse-exp "Error in parse-exp: let expression: declaration in let must be a list of length 2:" datum)]
             [(not (andmap symbol? (map 1st (2nd datum)))) (eopl:error 'parse-exp "Error in parse-exp: let expression: vars in let-exp must be symbols:" datum)]
             [else (let-exp (map list (imp-list-apply parse-exp (map 1st (2nd datum))) (imp-list-apply parse-exp (map 2nd (2nd datum)))) (map parse-exp (cddr datum)))]
@@ -170,6 +163,7 @@
             (imp-list-apply parse-exp (cdr datum)))])]
         [else (eopl:error 'parse-exp "bad expression: ~s" datum)])))
 
+
 (define unparse-exp
   (lambda (datum)
     (cases expression datum
@@ -208,13 +202,12 @@
             (cons (unparse-exp rator) (map unparse-exp rand))
             (list (unparse-exp rator) (unparse-exp rand)))])))
 
+; helpful functions for parser
 (define var-exp?
  (lambda (x)
    (cases expression x
      [var-exp (id) #t]
      [else #f])))
-; (var-exp? (var-exp 'a))
-; (var-exp? (app-exp (var-exp 'a) (var-exp 'b))) 
 
 (define valid-lambda-var?
   (lambda (datum)
@@ -242,8 +235,17 @@
       [else
         (cons (proc (car iList)) (imp-list-apply proc (cdr iList)))])))
 
-
-
+(define imp-list-unparse
+  (lambda (iList)
+    (cond
+      [(null? iList)
+        '()]
+      [(null? (cdr iList))
+        (list (unparse-exp (1st iList)))]
+      [(equal? "." (2nd iList))
+        (cons (cons (unparse-exp (1st iList)) (unparse-exp (3rd iList))) (imp-list-unparse (cddd r iList)))]
+      [else
+        (cons (unparse-exp (1st iList)) (imp-list-unparse (cdr iList)))])))
 
 ;-------------------+
 ;                   |
@@ -326,9 +328,19 @@
   (apply-env init-env id)]
       [app-exp (rator rands)
         (let ([proc-value (eval-exp rator)]
-              [args (eval-rands rands)])
+              [args (check-quote rator rands)])
           (apply-proc proc-value args))]
+      [lambda-exp (id body)
+      ;TODO implement lambdas
+        (display id)]
       [else (eopl:error 'eval-exp "Bad abstract syntax: ~a" exp)])))
+
+; checks the rator for a quote operator, if so it opts out of evaluating the rands
+(define check-quote
+  (lambda (rator rands)
+    (if (equal? (cadr rator) 'quote)
+          (map unparse-exp rands)
+          (eval-rands rands))))
 
 ; evaluate the list of operands, putting results into a list
 
@@ -349,7 +361,7 @@
                    "Attempt to apply bad procedure: ~s" 
                     proc-value)])))
 
-(define *prim-proc-names* '(+ - * add1 sub1 cons =))
+(define *prim-proc-names* '(+ - * add1 sub1 cons = quote))
 
 (define init-env         ; for now, our initial global environment only contains 
   (extend-env            ; procedure names.  Recall that an environment associates
@@ -371,6 +383,7 @@
       [(sub1) (- (1st args) 1)]
       [(cons) (cons (1st args) (2nd args))]
       [(=) (= (1st args) (2nd args))]
+      [(quote) (car args)]
       [else (error 'apply-prim-proc 
             "Bad primitive procedure name: ~s" 
             prim-proc)])))
@@ -386,11 +399,3 @@
 
 (define eval-one-exp
   (lambda (x) (top-level-eval (parse-exp x))))
-
-
-
-
-
-
-
-
