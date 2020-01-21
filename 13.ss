@@ -74,7 +74,7 @@
    (name symbol?)]
   [closure
   (syms (list-of symbol?))
-  (body (list-of expression?))
+  (body (lambda (v) (or (expression? v) (list-of expression?))))
   (env environment?)
   ]
    )
@@ -342,7 +342,7 @@
               [args (check-quote rator rands env)])
           (apply-proc proc-value args))]
       [lambda-exp (id body)
-      (make-closure (map unparse-exp id) body env)
+      (make-closure (map-lr unparse-exp id) body env)
       ]
       [if-else-exp (test iftrue iffalse)
         (if (eval-exp test env)
@@ -351,6 +351,13 @@
 
       
       [else (eopl:error 'eval-exp "Bad abstract syntax: ~a" exp)])))
+
+; maps from left to right
+(define map-lr
+  (lambda (proc li)
+    (if (null? li)
+      '()
+      (cons (proc (car li)) (map-lr proc (cdr li))))))
 
 ; (define eval-bodies
 ;   (lambda (body env)
@@ -376,8 +383,8 @@
   (lambda (proc-value args)
     (cases proc-val proc-value
       [prim-proc (op) (apply-prim-proc op args)]
-      [closure (ids bodies env)
-      (eval-exp bodies (extend-env id args env))
+      [closure (id bodies env)
+        (map-lr (lambda (x) (eval-exp x (extend-env id args env))) bodies)
       ]
       ; [closure (id bodies env)
       ; (eval-bodies bodies (extend-env id args env))
