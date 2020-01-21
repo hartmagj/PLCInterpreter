@@ -338,6 +338,7 @@
         (eval-exp (1st bodies) env)
         (eval-let (cdr bodies) env)))))
 
+
 (define eval-exp
   (lambda (exp env)
     (cases expression exp
@@ -392,7 +393,7 @@
     (cases proc-val proc-value
       [prim-proc (op) (apply-prim-proc op args)]
       [closure (id bodies env)
-        (map-lr (lambda (x) (eval-exp x (extend-env id args env))) bodies)
+        (eval-let bodies (extend-env id args env))
       ]
       ; [closure (id bodies env)
       ; (eval-bodies bodies (extend-env id args env))
