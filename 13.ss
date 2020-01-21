@@ -330,6 +330,13 @@
     (eval-exp form init-env)))
 
 ; eval-exp is the main component of the interpreter
+(define eval-let
+  (lambda (bodies env)
+    (if (null? (cdr bodies))
+      (eval-exp (car bodies) env)
+      (begin
+        (eval-exp (1st bodies) env)
+        (eval-let (cdr bodies) env)))))
 
 (define eval-exp
   (lambda (exp env)
@@ -348,7 +355,8 @@
         (if (eval-exp test env)
           (eval-exp iftrue env)
           (eval-exp iffalse env))]
-
+      [let-exp (id body)
+         (eval-let body (extend-env (map 2nd (map 1st id)) (map (lambda (x) (eval-exp x env)) (map 2nd id)) env))]
       
       [else (eopl:error 'eval-exp "Bad abstract syntax: ~a" exp)])))
 
@@ -376,7 +384,7 @@
   (lambda (proc-value args)
     (cases proc-val proc-value
       [prim-proc (op) (apply-prim-proc op args)]
-      [closure (ids bodies env)
+      [closure (id bodies env)
       (eval-exp bodies (extend-env id args env))
       ]
       ; [closure (id bodies env)
@@ -389,7 +397,7 @@
 
 (define *prim-proc-names* 
   '(+ - * / add1 sub1 cons = >= <= quote list eq? equal? length list->vector 
-    not zero? car cdr null? list? pair? vector->list vector? 
+    not zero? car cdr null? list? pair? vector->list vector? set-car! set-cdr!
     number? symbol? caar cadr cadar procedure?))
 
 (define init-env         ; for now, our initial global environment only contains 
@@ -423,6 +431,8 @@
       [(list->vector) (list->vector (car args))]
       [(not) (not (car args))]
       [(zero?) (zero? (car args))]
+      [(set-car!) (set-car! (1st args) (2nd args))]
+      [(set-cdr!) (set-cdr! (1st args) (2nd args))]
       [(car) (car (1st args))]
       [(cdr) (cdar args)]
       [(null?) (null? (car args))]
