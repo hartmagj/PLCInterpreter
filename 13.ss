@@ -411,7 +411,7 @@
       [(/) (apply / args)]
       [(add1) (+ (1st args) 1)]
       [(sub1) (- (1st args) 1)]
-      [(cons) (display args)]
+      [(cons) (cons (1st args) (2nd args))]
       [(=) (apply = args)]
       [(>=) (apply >= args)]
       [(<=) (apply <= args)]
@@ -435,7 +435,7 @@
       [(caar) (caar (car args))]
       [(cadr) (cadr (car args))]
       [(cadar) (cadar (car args))]
-      [(procedure?) (procedure? (car args))]
+      [(procedure?) (apply proc-val? args)]
       [else (error 'apply-prim-proc 
             "Bad primitive procedure name: ~s" 
             prim-proc)])))
