@@ -65,21 +65,19 @@
    (vals (list-of scheme-value?))
    (env environment?)])
 
-(define-datatype closure closure?
-  [full-closure
-  (syms (list-of symbol?))
-  (body (list-of expression?))
-  (env environment?)
-  ]
-  )
-
 
 ; datatype for procedures.  At first there is only one
 ; kind of procedure, but more kinds will be added later.
 
 (define-datatype proc-val proc-val?
   [prim-proc
-   (name symbol?)])
+   (name symbol?)]
+  [closure
+  (syms (list-of symbol?))
+  (body (list-of expression?))
+  (env environment?)
+  ]
+   )
 
   
 ;-------------------+
@@ -336,12 +334,13 @@
   (apply-env env id)]
       [app-exp (rator rands)
         (let ([proc-value (eval-exp rator env)]
-              [args (check-quote rator rands)])
+              [args (check-quote rator rands env)])
           (apply-proc proc-value args))]
       [if-else-exp (test iftrue iffalse)
         (if (eval-exp test env)
           (eval-exp iftrue env)
           (eval-exp iffalse env))]
+
       
       [else (eopl:error 'eval-exp "Bad abstract syntax: ~a" exp)])))
 
@@ -350,16 +349,16 @@
 ;     ()))
 ; checks the rator for a quote operator, if so it opts out of evaluating the rands
 (define check-quote
-  (lambda (rator rands)
+  (lambda (rator rands env)
     (if (equal? (cadr rator) 'quote)
           (map unparse-exp rands)
-          (eval-rands rands))))
+          (eval-rands rands env))))
 
 ; evaluate the list of operands, putting results into a list
 
 (define eval-rands
-  (lambda (rands)
-    (map eval-exp rands env)))
+  (lambda (rands env)
+    (map (lambda (x) eval-exp x env) rands)))
 
 ;  Apply a procedure to its arguments.
 ;  At this point, we only have primitive procedures.  
@@ -369,9 +368,10 @@
   (lambda (proc-value args)
     (cases proc-val proc-value
       [prim-proc (op) (apply-prim-proc op args)]
-      [closure (id bodies env)
-      (eval-bodies bodies (extend-env id args env))
-      ]
+
+      ; [closure (id bodies env)
+      ; (eval-bodies bodies (extend-env id args env))
+      ; ]
       ; You will add other cases
       [else (eopl:error 'apply-proc
                    "Attempt to apply bad procedure: ~s" 
