@@ -274,6 +274,11 @@
   (lambda (syms vals env)
     (extended-env-record syms vals env)))
 
+(define make-closure
+  (lambda (ids bodies env)
+    (closure ids bodies env)
+    ))
+
 (define list-find-position
   (lambda (sym los)
     (let loop ([los los] [pos 0])
@@ -336,6 +341,9 @@
         (let ([proc-value (eval-exp rator env)]
               [args (check-quote rator rands env)])
           (apply-proc proc-value args))]
+      [lambda-exp (id body)
+      (make-closure (map unparse-exp id) body env)
+      ]
       [if-else-exp (test iftrue iffalse)
         (if (eval-exp test env)
           (eval-exp iftrue env)
@@ -358,7 +366,7 @@
 
 (define eval-rands
   (lambda (rands env)
-    (map (lambda (x) eval-exp x env) rands)))
+    (map (lambda (x) (eval-exp x env)) rands)))
 
 ;  Apply a procedure to its arguments.
 ;  At this point, we only have primitive procedures.  
@@ -368,7 +376,9 @@
   (lambda (proc-value args)
     (cases proc-val proc-value
       [prim-proc (op) (apply-prim-proc op args)]
-
+      [closure (ids bodies env)
+      (eval-exp bodies (extend-env id args env))
+      ]
       ; [closure (id bodies env)
       ; (eval-bodies bodies (extend-env id args env))
       ; ]
@@ -410,22 +420,21 @@
       [(eq?) (eq? (1st args) (2nd args))]
       [(equal?) (equal? (1st args) (2nd args))]
       [(length) (length(car  args))]
-      [(list->vector) (list->vector args)]
+      [(list->vector) (list->vector (car args))]
       [(not) (not (car args))]
       [(zero?) (zero? (car args))]
-      [(car) (1st args)]
-      [(cdr) (cdr args)]
-      [(procedure?)]
+      [(car) (car (1st args))]
+      [(cdr) (cdar args)]
       [(null?) (null? (car args))]
       [(list?) (list? (car args))]
       [(pair?) (pair? (car args))]
-      [(vector->list) (vector->list (car args))]
+      [(vector->list) (vector->list (1st args))]
       [(vector?) (vector? (car args))]
       [(number?) (number? (car args))]
       [(symbol?) (symbol? (car args))]
-      [(caar) (caaar args)]
-      [(cadr) (cadar args)]
-      [(cadar) (cadaar args)]
+      [(caar) (caar (car args))]
+      [(cadr) (cadr (car args))]
+      [(cadar) (cadar (car args))]
       [(procedure?) (procedure? (car args))]
       [else (error 'apply-prim-proc 
             "Bad primitive procedure name: ~s" 
