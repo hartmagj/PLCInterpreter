@@ -73,7 +73,7 @@
   [prim-proc
    (name symbol?)]
   [closure
-  (syms (lambda (v) (or (list-of symbol? v) (null? v))))
+  (syms (lambda (v) (or (list-of symbol? v) (null? v) (symbol? v))))
   (body (lambda (v) (or (expression? v) (list-of expression?))))
   (env environment?)
   ]
@@ -350,11 +350,15 @@
               [args (check-quote rator rands env)])
           (apply-proc proc-value args))]
       [lambda-exp (id body)
-        (if (null? id)
-          (make-closure id body env)
-          (if (list? (car id))
-            (make-closure (map-lr unparse-exp id) body env)
-            (make-closure (list (unparse-exp id)) body env)))
+        (cond
+          [(null? id)
+            (make-closure id body env)]
+          [(and (list? (car id)) (list-contains? "." id))
+            (make-closure (make-imp (map-lr unparse-exp (remove "." id))) body env)]
+          [(list? (car id))
+            (make-closure (map-lr unparse-exp id) body env)]
+          [else
+            (make-closure (unparse-exp id) body env)])
       ]
       [if-else-exp (test iftrue iffalse)
         (if (eval-exp test env)
@@ -364,6 +368,22 @@
          (eval-let body (extend-env (map 2nd (map 1st id)) (map (lambda (x) (eval-exp x env)) (map 2nd id)) env))]
       
       [else (eopl:error 'eval-exp "Bad abstract syntax: ~a" exp)])))
+
+;makes a list improper
+(define make-imp
+  (lambda (li)
+    (if (eq? 1 (length (cdr li)))
+      (cons (car li) (cadr li))
+      (cons (car li) (make-imp (cdr li))))))
+
+; finds if a given object is in a list
+(define list-contains?
+  (lambda (n li)
+    (if (null? li)
+      #f
+      (if (equal? n (car li))
+        #t
+        (list-contains? n (cdr li))))))
 
 ; maps from left to right
 (define map-lr
@@ -397,7 +417,15 @@
     (cases proc-val proc-value
       [prim-proc (op) (apply-prim-proc op args)]
       [closure (id bodies env)
-        (eval-let bodies (extend-env id args env))
+        ;(display id)
+        (cond
+          [(list? id)
+            (eval-let bodies (extend-env id args env))]
+          [(pair? id)
+            (let ([res (match-imp-args id args)])
+              (eval-let bodies (extend-env (car res) (cadr res) env)))]
+          [else
+            (eval-let bodies (extend-env (list id) (list args) env))])
       ]
       ; [closure (id bodies env)
       ; (eval-bodies bodies (extend-env id args env))
@@ -408,7 +436,7 @@
                     proc-value)])))
 
 (define *prim-proc-names* 
-  '(+ - * / add1 sub1 cons = >= <= quote list eq? equal? length list->vector 
+  '(+ - * / add1 sub1 cons = >= <= < > quote list eq? equal? length list->vector 
     not zero? car cdr null? list? pair? vector->list vector? set-car! set-cdr!
     number? symbol? caar cadr cadar procedure? vector-ref vector apply map))
 
@@ -418,6 +446,17 @@
      (map prim-proc      
           *prim-proc-names*)
      (empty-env)))
+
+; handles improper lists in closure id fields
+(define match-imp-args
+  (lambda (id args)
+    (if (null? id)
+      '(()())
+      (if (not (pair? id))
+        (let ([res (match-imp-args '() (cdr args))])
+          (list (cons id (car res)) (cons args (cadr res))))
+        (let ([res (match-imp-args (cdr id) (cdr args))])
+          (list (cons (car id) (car res)) (cons (car args) (cadr res))))))))
 
 ; Usually an interpreter must define each 
 ; built-in procedure individually.  We are "cheating" a little bit.
@@ -435,6 +474,8 @@
       [(=) (apply = args)]
       [(>=) (apply >= args)]
       [(<=) (apply <= args)]
+      [(>) (apply > args)]
+      [(<) (apply < args)]
       [(quote) (car args)]
       [(list) (apply list args)]
       [(eq?) (eq? (1st args) (2nd args))]
