@@ -73,7 +73,12 @@
   [extended-env-record
    (syms (list-of symbol?))
    (vals (list-of scheme-value?))
-   (env environment?)])
+   (env environment?)]
+  [recursive-env-reord
+    (proc-names (list-of symbol?))
+    (idss (list-of (list-of symbol?)))
+    (bodiess (list-of (list-of expression?)))
+    (old-env environment?)])
 
 
 ; datatype for procedures.  At first there is only one
@@ -323,6 +328,10 @@
     (closure ids bodies env)
     ))
 
+(define recursive-env
+  (lambda (proc-names idss bodiess env)
+    (recursive-env-reord proc-names idss bodiess env)))
+
 (define list-find-position
   (lambda (sym los)
     (let loop ([los los] [pos 0])
@@ -339,7 +348,14 @@
   (let ((pos (list-find-position sym syms)))
           (if (number? pos)
         (list-ref vals pos)
-        (apply-env env sym)))])))
+        (apply-env env sym)))]
+      [recursive-env-reord (proc-names idss bodiess old-env)
+        (let ([pos (list-find-position sym proc-names)])
+          (if (number? pos)
+            (make-closure (list-ref idss pos)
+              (list-ref bodiess pos)
+              env)
+            (apply-env old-env sym)))])))
 
 
 ;-----------------------+
@@ -480,6 +496,10 @@
         (begin (eval-exp (syntax-expand body) env) (loop))
         ))]) (loop))
       ]
+      [letrec-exp (proc-names idss bodiess letrec-bodies)
+        (map (lambda (body) 
+            (eval-exp body (recursive-env proc-names idss bodiess env))) 
+          letrec-bodies)]
       [else (eopl:error 'eval-exp "Bad abstract syntax: ~a" exp)])))
 
 ; maps from left to right
