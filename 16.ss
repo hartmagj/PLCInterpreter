@@ -54,7 +54,12 @@
    (body (list-of expression?))]
   [app-exp
    (rator expression?)
-   (rand (lambda (v) (or (expression? v) (list-of expression?))))])
+   (rand (lambda (v) (or (expression? v) (list-of expression?))))]
+  [named-let-exp
+    (proc symbol?)
+    (ids (list-of symbol?))
+    (call-vals (list-of expression?))
+    (bodies (list-of expression?))])
 
 ; helper procedure
 (define lit?
@@ -138,6 +143,20 @@
           ]
           [(andmap (lambda (x) (ormap (lambda (pred) (pred x)) (list number? boolean? string? vector?))) datum) (lit-exp datum)]
           [(eqv? (1st datum) 'quote) (lit-exp (2nd datum))]
+          [(and (eqv? (1st datum) 'let) (symbol? (2nd datum))) ;named-let case
+            (cond
+              [(not (> (length datum) 2)) (eopl:error 'parse-exp "Error in parse-exp: let expression: incorrect length:" datum)]
+              [(not (list? (3rd datum))) (eopl:error 'parse-exp "Error in parse-exp: let expression: declaration in let is not a list:" datum)]
+              [(not (andmap list? (3rd datum))) (eopl:error 'parse-exp "Error in parse-exp: let expression: all let variables are not represented as proper lists: " datum)]
+              [(not (andmap (lambda (x) (= 2 (length x))) (3rd datum))) (eopl:error 'parse-exp "Error in parse-exp: let expression: declaration in let must be a list of length 2:" datum)]
+              [(not (andmap symbol? (map 1st (3rd datum)))) (eopl:error 'parse-exp "Error in parse-exp: let expression: vars in let-exp must be symbols:" datum)]
+              [else 
+                (named-let-exp
+                  (2nd datum)
+                  (map 1st (3rd datum))
+                  (map parse-exp (map 2nd (3rd datum)))
+                  (map parse-exp (cdddr datum)))]
+            )]
           [(eqv? (1st datum) 'let)
           (cond
             [(not (> (length datum) 2)) (eopl:error 'parse-exp "Error in parse-exp: let expression: incorrect length:" datum)]
@@ -379,10 +398,24 @@
       ; [case-exp (conditional body)
       ; (syntax-expand (let-exp (list ())))
       ; ]
+      [named-let-exp (proc ids call-vals bodies)
+        (letrec-exp 
+          (list proc)
+          (list ids)
+          (list (map syntax-expand bodies))
+          (list (app-exp (var-exp proc) (map syntax-expand call-vals))))]
+      [letrec-exp (proc-names idss bodiess letrec-bodies)
+        (letrec-exp
+          proc-names
+          idss
+          (map (lambda (x) (map syntax-expand x)) bodiess)
+          (map syntax-expand letrec-bodies))]
       [else exp]
       )))
 
-(define let*-exp
+
+;(define let*-exp
+(define let*-help
   (lambda (id body)
     (if(null? id)
       (let-exp '() body)
