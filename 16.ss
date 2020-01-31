@@ -473,71 +473,72 @@
 
 
 (define eval-exp
-  (lambda (exp env)
-    (cases expression exp
-      [lit-exp (datum) datum]
-      [var-exp (id)
-        (apply-env env id)]
-      [app-exp (rator rands)
-        (let ([proc-value (eval-exp rator env)]
-              [args (check-quote rator rands env)])
-          (apply-proc proc-value args))]
-      [lambda-exp (id body)
-        (cond
-          [(null? id)
-            (make-closure id body env)]
-          [(and (list? (car id)) (list-contains? "." id))
-            (make-closure (make-imp (map-lr unparse-exp (remove "." id))) body env)]
-          [(list? (car id))
-            (make-closure (map-lr unparse-exp id) body env)]
-          [else
-            (make-closure (unparse-exp id) body env)])
-      ]
-      [if-exp (test iftrue)
-      (if (equal? test '(var-exp else)) (eval-exp iftrue env)
-        (if (eval-exp test env) (eval-exp iftrue env))
-        )
-      ]
-      [if-else-exp (test iftrue iffalse)
-        (if (eval-exp test env)
-          (eval-exp iftrue env)
-          (eval-exp iffalse env))]
-      [begin-exp (body)
-        (for-each (lambda (x) (eval-exp x env)) (map syntax-expand body))]
-      [or-exp (body)
-      (if (null? body)
-      #f
-      (let ([temp (eval-exp (syntax-expand (1st body)) env)])
-        (if temp
-          temp
-          (eval-exp (or-exp (cdr body)) env)
+  (lambda (expr env)
+    (let ([exp (syntax-expand expr)])
+      (cases expression exp
+        [lit-exp (datum) datum]
+        [var-exp (id)
+          (apply-env env id)]
+        [app-exp (rator rands)
+          (let ([proc-value (eval-exp rator env)]
+                [args (check-quote rator rands env)])
+            (apply-proc proc-value args))]
+        [lambda-exp (id body)
+          (cond
+            [(null? id)
+              (make-closure id body env)]
+            [(and (list? (car id)) (list-contains? "." id))
+              (make-closure (make-imp (map-lr unparse-exp (remove "." id))) body env)]
+            [(list? (car id))
+              (make-closure (map-lr unparse-exp id) body env)]
+            [else
+              (make-closure (unparse-exp id) body env)])
+        ]
+        [if-exp (test iftrue)
+        (if (equal? test '(var-exp else)) (eval-exp iftrue env)
+          (if (eval-exp test env) (eval-exp iftrue env))
           )
-        ))
-      ]
-      [and-exp (body)
-      (if (null? body)
-      #t
-      (let ([temp (eval-exp (syntax-expand (1st body)) env)])
-        (if temp
-          (eval-exp (syntax-expand (car body)) env)
-          #f
-          )
-        ))
-      ]
-      [let-exp (id body)
-         ;(eval-let body (extend-env (map 2nd (map 1st id)) (map (lambda (x) (eval-exp x env)) (map 2nd id)) env))]
-         (eval-exp (syntax-expand exp) env)
-      ]
-      [while-exp (test body)
-      (letrec ([loop (lambda () (if (eval-exp test env) 
-        (begin (eval-exp (syntax-expand body) env) (loop))
-        ))]) (loop))
-      ]
-      [letrec-exp (proc-names idss bodiess letrec-bodies)
-        (eval-let letrec-bodies (recursive-env proc-names idss (map list (map syntax-expand (map car bodiess))) env))]
-      [named-let-exp (a b c d)
-        (eval-exp (syntax-expand exp) env)]
-      [else (eopl:error 'eval-exp "Bad abstract syntax: ~a" exp)])))
+        ]
+        [if-else-exp (test iftrue iffalse)
+          (if (eval-exp test env)
+            (eval-exp iftrue env)
+            (eval-exp iffalse env))]
+        [begin-exp (body)
+          (for-each (lambda (x) (eval-exp x env)) (map syntax-expand body))]
+        [or-exp (body)
+        (if (null? body)
+        #f
+        (let ([temp (eval-exp (syntax-expand (1st body)) env)])
+          (if temp
+            temp
+            (eval-exp (or-exp (cdr body)) env)
+            )
+          ))
+        ]
+        [and-exp (body)
+        (if (null? body)
+        #t
+        (let ([temp (eval-exp (syntax-expand (1st body)) env)])
+          (if temp
+            (eval-exp (syntax-expand (car body)) env)
+            #f
+            )
+          ))
+        ]
+        [let-exp (id body)
+           ;(eval-let body (extend-env (map 2nd (map 1st id)) (map (lambda (x) (eval-exp x env)) (map 2nd id)) env))]
+           (eval-exp (syntax-expand exp) env)
+        ]
+        [while-exp (test body)
+        (letrec ([loop (lambda () (if (eval-exp test env) 
+          (begin (eval-exp (syntax-expand body) env) (loop))
+          ))]) (loop))
+        ]
+        [letrec-exp (proc-names idss bodiess letrec-bodies)
+          (eval-let letrec-bodies (recursive-env proc-names idss (map list (map syntax-expand (map car bodiess))) env))]
+        ; [named-let-exp (a b c d)
+        ;   (eval-exp (syntax-expand exp) env)]
+        [else (eopl:error 'eval-exp "Bad abstract syntax: ~a" exp)]))))
 
 ; maps from left to right
 (define map-lr
@@ -689,5 +690,5 @@
       (rep))))  ; tail-recursive, so stack doesn't grow.
 
 (define eval-one-exp
-  (lambda (x) (top-level-eval (syntax-expand (parse-exp x)))))
+  (lambda (x) (top-level-eval (parse-exp x))))
 
