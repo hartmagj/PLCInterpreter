@@ -240,9 +240,9 @@
         [let-exp (id body)
         (cons 'let (cons (map list (map unparse-exp (map 1st id)) (map unparse-exp (map 2nd id))) (map unparse-exp body)))
           ]
-        [letrec-exp (id body)
-        (cons 'letrec (cons (map list (map unparse-exp (map 1st id)) (map unparse-exp (map 2nd id))) (map unparse-exp body)))
-
+        [letrec-exp (proc-names idss bodiess letrec-bodies)
+        ;(cons 'letrec (cons (map list (map unparse-exp (map 1st id)) (map unparse-exp (map 2nd id))) (map unparse-exp body)))
+          (display "update this")
           ]
         [let*-exp (id body)
         (cons 'let* (cons (map list (map unparse-exp (map 1st id)) (map unparse-exp (map 2nd id))) (map unparse-exp body)))
@@ -274,7 +274,9 @@
         [app-exp (rator rand)
           (if (list? rand)
             (cons (unparse-exp rator) (map unparse-exp rand))
-            (list (unparse-exp rator) (unparse-exp rand)))])))
+            (list (unparse-exp rator) (unparse-exp rand)))]
+        [else
+          (display "unparse error")])))
 
 ; helpful functions for parser
 (define var-exp?
@@ -374,7 +376,9 @@
             (make-closure (list-ref idss pos)
               (list-ref bodiess pos)
               env)
-            (apply-env old-env sym)))])))
+            (apply-env old-env sym)))]
+        [else
+          (display "apply-env error")])))
 
 
 ;-----------------------+
