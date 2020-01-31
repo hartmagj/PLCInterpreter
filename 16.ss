@@ -535,6 +535,8 @@
       ]
       [letrec-exp (proc-names idss bodiess letrec-bodies)
         (eval-let letrec-bodies (recursive-env proc-names idss (map list (map syntax-expand (map car bodiess))) env))]
+      [named-let-exp (a b c d)
+        (eval-exp (syntax-expand exp) env)]
       [else (eopl:error 'eval-exp "Bad abstract syntax: ~a" exp)])))
 
 ; maps from left to right
@@ -602,7 +604,7 @@
   '(+ - * / add1 sub1 cons = >= <= < > quote list eq? equal? length list->vector 
     not zero? car cdr null? list? pair? vector->list vector? set-car! set-cdr!
     number? symbol? caar cadr cadar procedure? vector-ref vector apply map quotient member vector-set!
-    eqv?))
+    eqv? append list-tail))
 
 (define init-env         ; for now, our initial global environment only contains 
   (extend-env            ; procedure names.  Recall that an environment associates
@@ -671,6 +673,8 @@
       [(apply) (apply (lambda v (apply-proc (1st args) v)) (2nd args))]
       [(map) (map (lambda (v) (apply-proc (1st args) (list v))) (2nd args))]
       [(eqv?) (eqv? (1st args) (2nd args))]
+      [(append) (apply append args)]
+      [(list-tail) (list-tail (1st args) (2nd args))]
       [else (error 'apply-prim-proc 
             "Bad primitive procedure name: ~s" 
             prim-proc)])))
@@ -686,3 +690,4 @@
 
 (define eval-one-exp
   (lambda (x) (top-level-eval (syntax-expand (parse-exp x)))))
+
