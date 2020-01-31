@@ -534,9 +534,7 @@
         ))]) (loop))
       ]
       [letrec-exp (proc-names idss bodiess letrec-bodies)
-        (map (lambda (body) 
-            (eval-exp body (recursive-env proc-names idss bodiess env))) 
-          letrec-bodies)]
+        (eval-let letrec-bodies (recursive-env proc-names idss (map list (map syntax-expand (map car bodiess))) env))]
       [else (eopl:error 'eval-exp "Bad abstract syntax: ~a" exp)])))
 
 ; maps from left to right
@@ -658,7 +656,7 @@
       [(cdr) (cdar args)]
       [(null?) (null? (car args))]
       [(list?) (list? (car args))]
-      [(pair?) (pair? (car args))]
+      [(pair?) (pair? (car args))] 
       [(vector->list) (vector->list (1st args))]
       [(vector?) (vector? (car args))]
       [(number?) (number? (car args))]
