@@ -51,7 +51,7 @@
       (body (list-of expression?))]
    [set!-exp
    (id symbol?)
-   (body (list-of expression?))]
+   (body expression?)]
   [app-exp
    (rator expression?)
    (rand (lambda (v) (or (expression? v) (list-of expression?))))]
@@ -189,7 +189,7 @@
           [(eqv? (1st datum) 'set!)
           (cond 
             [(not (= (length datum) 3)) (eopl:error 'parse-exp "Error in parse-exp: set! expression: incorrect length:" datum)]
-            [else (set!-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)))]
+            [else (set!-exp (2nd datum) (parse-exp (3rd datum)))]
             )
           ]
           [(eqv? (1st datum) 'letrec)
@@ -342,7 +342,7 @@
 
 (define extend-env
   (lambda (syms vals env)
-    (extended-env-record syms vals env)))
+    (extended-env-record syms (map box vals) env)))
 
 (define make-closure
   (lambda (ids bodies env)
@@ -360,7 +360,7 @@
       [(eq? sym (car los)) pos]
       [else (loop (cdr los) (add1 pos))]))))
       
-(define apply-env
+(define apply-env-help
   (lambda (env sym) 
     (cases environment env 
       [empty-env-record ()      
@@ -369,18 +369,21 @@
   (let ((pos (list-find-position sym syms)))
           (if (number? pos)
         (list-ref vals pos)
-        (apply-env env sym)))]
+        (apply-env-help env sym)))]
       [recursive-env-reord (proc-names idss bodiess old-env)
         (let ([pos (list-find-position sym proc-names)])
           (if (number? pos)
             (make-closure (list-ref idss pos)
               (list-ref bodiess pos)
               env)
-            (apply-env old-env sym)))]
+            (apply-env-help old-env sym)))]
         [else
-          (display "apply-env error")])))
+          (display "apply-env-help error")])))
 
-
+(define apply-env
+  (lambda (env sym)
+    (unbox (apply-env-help env sym)))
+  )
 ;-----------------------+
 ;                       |
 ;   SYNTAX EXPANSION    |
@@ -528,6 +531,9 @@
          ;(eval-let body (extend-env (map 2nd (map 1st id)) (map (lambda (x) (eval-exp x env)) (map 2nd id)) env))]
          (eval-exp (syntax-expand exp) env)
       ]
+      [set!-exp (var body)
+      (set-box! (apply-env-help env var) (eval-exp (syntax-expand body) env))
+          ]
       [while-exp (test body)
       (letrec ([loop (lambda () (if (eval-exp test env) 
         (begin (eval-exp (syntax-expand body) env) (loop))
@@ -550,7 +556,9 @@
     (if (eq? 1 (length (cdr li)))
       (cons (car li) (cadr li))
       (cons (car li) (make-imp (cdr li))))))
+; (define (apply-env-ref-global sym env)
 
+;   )
 ; finds if a given object is in a list
 (define list-contains?
   (lambda (n li)
@@ -660,7 +668,7 @@
       [(zero?) (zero? (car args))]
       [(set-car!) (set-car! (1st args) (2nd args))]
       [(set-cdr!) (set-cdr! (1st args) (2nd args))]
-      [(car) (car (1st args))]
+      [(car) (car (1st args))] 
       [(cdr) (cdar args)]
       [(null?) (null? (car args))]
       [(list?) (list? (car args))]
