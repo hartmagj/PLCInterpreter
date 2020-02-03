@@ -51,7 +51,7 @@
       (body (list-of expression?))]
    [set!-exp
    (id symbol?)
-   (body (list-of expression?))]
+   (body expression?)]
   [app-exp
    (rator expression?)
    (rand (lambda (v) (or (expression? v) (list-of expression?))))]
@@ -200,7 +200,7 @@
           [(eqv? (1st datum) 'set!)
           (cond 
             [(not (= (length datum) 3)) (eopl:error 'parse-exp "Error in parse-exp: set! expression: incorrect length:" datum)]
-            [else (set!-exp (parse-exp (2nd datum)) (parse-exp (3rd datum)))]
+            [else (set!-exp (2nd datum) (parse-exp (3rd datum)))]
             )
           ]
           [(eqv? (1st datum) 'letrec)
@@ -355,7 +355,7 @@
 
 (define extend-env
   (lambda (syms vals env)
-    (extended-env-record syms vals env)))
+    (extended-env-record syms (map box vals) env)))
 
 (define make-closure
   (lambda (ids bodies env)
@@ -373,7 +373,7 @@
       [(eq? sym (car los)) pos]
       [else (loop (cdr los) (add1 pos))]))))
       
-(define apply-env
+(define apply-env-help
   (lambda (env sym) 
     (cases environment env 
       [empty-env-record ()      
@@ -382,16 +382,21 @@
   (let ((pos (list-find-position sym syms)))
           (if (number? pos)
         (list-ref vals pos)
-        (apply-env env sym)))]
+        (apply-env-help env sym)))]
       [recursive-env-reord (proc-names idss bodiess old-env)
         (let ([pos (list-find-position sym proc-names)])
           (if (number? pos)
             (make-closure (list-ref idss pos)
               (list-ref bodiess pos)
               env)
-            (apply-env old-env sym)))]
+            (apply-env-help old-env sym)))]
         [else
-          (display "apply-env error")])))
+          (display "apply-env-help error")])))
+
+(define apply-env
+  (lambda (env sym)
+    (unbox (apply-env-help env sym)))
+  )
 
 (define add-to-glob-env
   (lambda (s v)
@@ -399,9 +404,9 @@
       [extended-env-record (syms vals env)
         (if (list-contains? s syms)
           (let ([nSyms (remove s syms)]
-                [nVals (remq (list-ref vals (list-find-position s syms)) vals)])
+                [nVals (remq (list-ref vals (list-find-position s syms)) (map unbox vals))])
             (set! init-env (extend-env (cons s nSyms) (cons v nVals) env)))
-          (set! init-env (extend-env (cons s syms) (cons v vals) env)))]
+          (set! init-env (extend-env (cons s syms) (cons v (map unbox vals)) env)))]
       [else
         (display "error: global env is not an extended-env-record")])))
 
@@ -558,6 +563,9 @@
         (begin (eval-exp (syntax-expand body) env) (loop))
         ))]) (loop))
       ]
+      [set!-exp (var body)
+      (set-box! (apply-env-help env var) (eval-exp (syntax-expand body) env))
+          ]
       [letrec-exp (proc-names idss bodiess letrec-bodies)
         (eval-let letrec-bodies (recursive-env proc-names idss (map list (map syntax-expand (map car bodiess))) env))]
       
@@ -575,7 +583,9 @@
     (if (eq? 1 (length (cdr li)))
       (cons (car li) (cadr li))
       (cons (car li) (make-imp (cdr li))))))
+; (define (apply-env-ref-global sym env)
 
+;   )
 ; finds if a given object is in a list
 (define list-contains?
   (lambda (n li)
