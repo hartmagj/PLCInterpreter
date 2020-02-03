@@ -59,7 +59,10 @@
     (proc symbol?)
     (ids (list-of symbol?))
     (call-vals (list-of expression?))
-    (bodies (list-of expression?))])
+    (bodies (list-of expression?))]
+  [define-exp
+    (sym expression?)
+    (val expression?)])
 
 ; helper procedure
 (define lit?
@@ -141,6 +144,14 @@
                 (lambda-exp (imp-list-apply parse-exp (2nd datum)) (imp-list-apply parse-exp (cddr datum)))]
             )
           ]
+          [(eqv? (1st datum) 'define)
+            (cond
+              [(not (eq? (length datum) 3))
+                (eopl:error 'parse-exp "Error in parse-exp: define-expression: incorrect length:" datum)]
+              [(not (symbol? (2nd datum)))
+                (eopl:error 'parse-exp "Error in parse-exp: define-expression: first arg must be a symbol:" datum)]
+              [else
+                (define-exp (parse-exp (2nd datum)) (apply parse-exp (cddr datum)))])]
           [(andmap (lambda (x) (ormap (lambda (pred) (pred x)) (list number? boolean? string? vector?))) datum) (lit-exp datum)]
           [(eqv? (1st datum) 'quote) (lit-exp (2nd datum))]
           [(and (eqv? (1st datum) 'let) (symbol? (2nd datum))) ;named-let case
@@ -237,12 +248,14 @@
           [else (cons 'lambda (cons (unparse-exp id) (map unparse-exp body)))]
           )
           ]
+        [define-exp (sym val)
+          (cons 'define (cons (unparse-exp sym) (list (unparse-exp val))))]
         [let-exp (id body)
         (cons 'let (cons (map list (map unparse-exp (map 1st id)) (map unparse-exp (map 2nd id))) (map unparse-exp body)))
           ]
         [letrec-exp (proc-names idss bodiess letrec-bodies)
         ;(cons 'letrec (cons (map list (map unparse-exp (map 1st id)) (map unparse-exp (map 2nd id))) (map unparse-exp body)))
-          (display "update this")
+          (display "update unparse letrec")
           ]
         [let*-exp (id body)
         (cons 'let* (cons (map list (map unparse-exp (map 1st id)) (map unparse-exp (map 2nd id))) (map unparse-exp body)))
@@ -379,6 +392,18 @@
             (apply-env old-env sym)))]
         [else
           (display "apply-env error")])))
+
+(define add-to-glob-env
+  (lambda (s v)
+    (cases environment init-env
+      [extended-env-record (syms vals env)
+        (if (list-contains? s syms)
+          (let ([nSyms (remove s syms)]
+                [nVals (remq (list-ref vals (list-find-position s syms)) vals)])
+            (set! init-env (extend-env (cons s nSyms) (cons v nVals) env)))
+          (set! init-env (extend-env (cons s syms) (cons v vals) env)))]
+      [else
+        (display "error: global env is not an extended-env-record")])))
 
 
 ;-----------------------+
