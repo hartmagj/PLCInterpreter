@@ -605,12 +605,19 @@
     number? symbol? caar cadr cadar procedure? vector-ref vector apply map quotient member vector-set!
     eqv? append list-tail))
 
+(define create-init-env
+  (lambda ()
+    (extend-env
+      *prim-proc-names*
+      (map prim-proc *prim-proc-names*)
+      (empty-env))))
+
 (define init-env         ; for now, our initial global environment only contains 
-  (extend-env            ; procedure names.  Recall that an environment associates
-     *prim-proc-names*   ;  a value (not an expression) with an identifier.
-     (map prim-proc      
-          *prim-proc-names*)
-     (empty-env)))
+  (create-init-env))
+
+(define reset-global-env
+  (lambda ()
+    (set! init-env (create-init-env))))
 
 ; handles improper lists in closure id fields
 (define match-imp-args
