@@ -1,4 +1,4 @@
-(load "D:\\CSSE 304\\Assignments\\chez-init.ss")
+;(load "D:\\CSSE 304\\Assignments\\chez-init.ss")
 (define-datatype expression expression?
   [var-exp
    (var symbol?)]
@@ -80,6 +80,8 @@
     [else '#f]))
 (define lexical?
   (lambda (x)
+    ; (display x)
+    ; (display "\n")
     (if (list x)
         (if (= (length x) 3)
             (if (equal? ': (1st x))
@@ -543,6 +545,7 @@
       (begin
         (eval-exp (1st bodies) env)
         (eval-let (cdr bodies) env)))))
+
 (define eval-rands-ref
   (lambda (rands env vars)
     (if (null? vars)
@@ -553,6 +556,36 @@
                     )
               (eval-rands-ref (cdr rands) env (cdr vars)))
             ))))
+
+(define get-val
+  (lambda (env pos)
+    (cases environment env
+      [extended-env-record (syms vals env)
+        (list-ref vals pos)]
+      [else 
+        (eopl:error 'get-val "not a valid get-val environment: ~a" env)])))
+
+(define get-enclosed
+  (lambda (env)
+    (cases environment env
+      [extended-env-record (syms vals env)
+        env]
+      [empty-env-record
+        init-env]
+      [root-env-record
+        (eopl:error 'get-enclosed "could not find the variable")])))
+
+(define get-var
+  (lambda (addr env)
+    (cases expression addr
+      [address (depth pos)
+        (if (eq? 'free depth)
+          (box (apply-env env pos))
+          (if (eq? 0 depth)
+            (get-val env pos)
+            (get-var (address (- depth 1) pos) (get-enclosed env))))]
+      [else
+        (eopl:error 'get-var "not a valid address: ~a" addr)])))
 
 (define eval-exp
   (lambda (express env)
@@ -630,10 +663,22 @@
         [set!-exp (var body)
         (set-box! (apply-env-help env var) (eval-exp (syntax-expand body) env))
             ]
+        [set!-address-exp (address body)
+           (let ([var (get-var address env)])
+                ; (display body)
+                ; (display "\n")
+                ; (display address)
+                ; (display "\n")
+                ; (display "\n")
+            (set-box! var (eval-exp (syntax-expand body) env)))]
         [letrec-exp (proc-names idss bodiess letrec-bodies)
           (eval-let letrec-bodies (recursive-env proc-names idss (map list (map syntax-expand (map car bodiess))) env))]
         [define-exp (sym val)
           (add-to-glob-env (unparse-exp sym) (eval-exp val env))]
+        [address (depth pos)
+          ; (display exp)
+          ; (display "\n")
+          (unbox (get-var exp env))]
         
         [else (eopl:error 'eval-exp "Bad abstract syntax: ~a" exp)]))))
 
@@ -757,7 +802,7 @@
       [(list) (apply list args)]
       [(eq?) (eq? (1st args) (2nd args))]
       [(equal?) (equal? (1st args) (2nd args))]
-      [(length) (length(car  args))]
+      [(length) (length (car args))]
       [(list->vector) (list->vector (car args))]
       [(not) (not (car args))]
       [(zero?) (zero? (car args))]
